@@ -33,7 +33,7 @@ vendor/
 
 # Kinetic specific
 .kinetic/
-node/
+.node-data/
 db/
 logs/
 staking/
