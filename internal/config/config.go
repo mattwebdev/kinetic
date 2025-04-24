@@ -1,12 +1,16 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/kinetic-dev/kinetic/internal/system"
 	"github.com/spf13/viper"
 )
+
+var globalConfig *Config
 
 // Config holds the application configuration
 type Config struct {
@@ -43,50 +47,80 @@ func DefaultConfig() *Config {
 	return cfg
 }
 
-// Load loads the configuration from file
-func Load() (*Config, error) {
-	configDir, err := system.GetUserConfigDir()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get config directory: %w", err)
-	}
-
-	// Set up Viper
-	v := viper.New()
-	v.SetConfigName("config")
-	v.SetConfigType("yaml")
-	v.AddConfigPath(configDir)
-
-	// Load defaults
-	cfg := DefaultConfig()
-
-	// Set up data directories
-	dataDir, err := system.GetDataDir()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get data directory: %w", err)
-	}
-
-	cfg.Node.DBDir = filepath.Join(dataDir, "db")
-	cfg.Node.LogDir = filepath.Join(dataDir, "logs")
-	cfg.Node.StakingDir = filepath.Join(dataDir, "staking")
-
-	// Try to read config file
-	if err := v.ReadInConfig(); err != nil {
-		// If config file doesn't exist, create it with defaults
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			configFile := filepath.Join(configDir, "config.yaml")
-			if err := v.SafeWriteConfigAs(configFile); err != nil {
-				return nil, fmt.Errorf("failed to write default config: %w", err)
-			}
-		} else {
-			return nil, fmt.Errorf("failed to read config: %w", err)
+// Get returns the global config instance
+func Get() *Config {
+	if globalConfig == nil {
+		// Return default config if not initialized
+		return &Config{
+			Node: struct {
+				Port       int    `mapstructure:"port"`
+				APIPort    int    `mapstructure:"api_port"`
+				NetworkID  int    `mapstructure:"network_id"`
+				DBDir      string `mapstructure:"db_dir"`
+				LogDir     string `mapstructure:"log_dir"`
+				StakingDir string `mapstructure:"staking_dir"`
+			}{
+				Port:       9650,
+				APIPort:    9651,
+				NetworkID:  12345,
+				DBDir:      "data",
+				LogDir:     "data",
+				StakingDir: "data",
+			},
 		}
 	}
+	return globalConfig
+}
 
-	// Unmarshal config
-	if err := v.Unmarshal(cfg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+// Load reads the config from the specified file
+func Load(configPath string) (*Config, error) {
+	if configPath == "" {
+		configPath = "config.json"
 	}
 
+	// Create default config if file doesn't exist
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		cfg := &Config{
+			Node: struct {
+				Port       int    `mapstructure:"port"`
+				APIPort    int    `mapstructure:"api_port"`
+				NetworkID  int    `mapstructure:"network_id"`
+				DBDir      string `mapstructure:"db_dir"`
+				LogDir     string `mapstructure:"log_dir"`
+				StakingDir string `mapstructure:"staking_dir"`
+			}{
+				Port:       9650,
+				APIPort:    9651,
+				NetworkID:  12345,
+				DBDir:      "data",
+				LogDir:     "data",
+				StakingDir: "data",
+			},
+		}
+		globalConfig = cfg
+		return cfg, nil
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	cfg := &Config{}
+	if err := json.Unmarshal(data, cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	// Ensure data directory is absolute
+	if !filepath.IsAbs(cfg.Node.DBDir) {
+		absPath, err := filepath.Abs(cfg.Node.DBDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve absolute path for data directory: %w", err)
+		}
+		cfg.Node.DBDir = absPath
+	}
+
+	globalConfig = cfg
 	return cfg, nil
 }
 
@@ -98,7 +132,7 @@ func (c *Config) Save() error {
 	}
 
 	v := viper.New()
-	v.SetConfigFile(filepath.Join(configDir, "config.yaml"))
+	v.SetConfigFile(filepath.Join(configDir, "config.json"))
 
 	// Convert config struct to map
 	if err := v.MergeConfigMap(map[string]interface{}{

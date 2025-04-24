@@ -1,0 +1,129 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract {{.ContractName}} is Ownable {
+    {{#if .HasStorage}}
+    // State variables
+    mapping(address => uint256) private _balances;
+    mapping(address => bool) private _whitelist;
+    uint256 private _totalValue;
+    {{/if}}
+
+    {{#if .HasEvents}}
+    // Events
+    event ValueStored(address indexed user, uint256 amount);
+    event ValueWithdrawn(address indexed user, uint256 amount);
+    {{#if .HasWhitelist}}
+    event WhitelistUpdated(address indexed account, bool status);
+    {{/if}}
+    {{/if}}
+
+    constructor() Ownable(msg.sender) {
+        {{#if .HasInitialSetup}}
+        // Initial setup code here
+        _totalValue = 0;
+        {{/if}}
+    }
+
+    {{#if .HasWhitelist}}
+    modifier onlyWhitelisted() {
+        require(_whitelist[msg.sender], "Caller is not whitelisted");
+        _;
+    }
+
+    function setWhitelistStatus(address account, bool status) public onlyOwner {
+        _whitelist[account] = status;
+        emit WhitelistUpdated(account, status);
+    }
+
+    function isWhitelisted(address account) public view returns (bool) {
+        return _whitelist[account];
+    }
+    {{/if}}
+
+    {{#if .HasStorage}}
+    function store(uint256 amount) public {{#if .HasWhitelist}}onlyWhitelisted{{/if}} {
+        require(amount > 0, "Amount must be greater than 0");
+        _balances[msg.sender] += amount;
+        _totalValue += amount;
+        emit ValueStored(msg.sender, amount);
+    }
+
+    function withdraw(uint256 amount) public {
+        require(_balances[msg.sender] >= amount, "Insufficient balance");
+        _balances[msg.sender] -= amount;
+        _totalValue -= amount;
+        emit ValueWithdrawn(msg.sender, amount);
+    }
+
+    function balanceOf(address account) public view returns (uint256) {
+        return _balances[account];
+    }
+
+    function totalValue() public view returns (uint256) {
+        return _totalValue;
+    }
+    {{/if}}
+
+    {{#if .HasEmergencyStop}}
+    bool private _paused;
+
+    event Paused(address account);
+    event Unpaused(address account);
+
+    modifier whenNotPaused() {
+        require(!_paused, "Contract is paused");
+        _;
+    }
+
+    modifier whenPaused() {
+        require(_paused, "Contract is not paused");
+        _;
+    }
+
+    function pause() public onlyOwner whenNotPaused {
+        _paused = true;
+        emit Paused(msg.sender);
+    }
+
+    function unpause() public onlyOwner whenPaused {
+        _paused = false;
+        emit Unpaused(msg.sender);
+    }
+    {{/if}}
+
+    {{#if .HasUpgradeable}}
+    // Function to upgrade contract logic
+    function upgrade(address newImplementation) public onlyOwner {
+        // Add upgrade logic here
+        // This is a placeholder - actual upgrade mechanism depends on your upgrade pattern
+        require(newImplementation != address(0), "Invalid implementation address");
+        // Implementation specific upgrade code
+    }
+    {{/if}}
+
+    {{#if .HasEmergencyWithdraw}}
+    // Emergency withdraw function
+    function emergencyWithdraw() public onlyOwner {
+        {{#if .HasEmergencyStop}}
+        require(_paused, "Contract must be paused for emergency withdraw");
+        {{/if}}
+        // Add emergency withdraw logic here
+        // Example: transfer all contract balance to owner
+        (bool success, ) = owner().call{value: address(this).balance}("");
+        require(success, "Transfer failed");
+    }
+    {{/if}}
+
+    // Receive function to accept ETH
+    receive() external payable {
+        // Add custom logic for receiving ETH
+    }
+
+    // Fallback function
+    fallback() external payable {
+        // Add custom logic for unknown function calls
+    }
+} 

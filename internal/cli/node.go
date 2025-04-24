@@ -1,8 +1,8 @@
 package cli
 
 import (
-	"context"
 	"fmt"
+	"time"
 
 	"github.com/kinetic-dev/kinetic/internal/config"
 	"github.com/kinetic-dev/kinetic/internal/node"
@@ -18,102 +18,104 @@ var nodeCmd = &cobra.Command{
 var nodeStartCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start local Avalanche node",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Starting local node...")
-
-		// Load config
-		cfg, err := config.Load()
-		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
-		}
-
-		// Override config with flags if provided
-		if port, _ := cmd.Flags().GetInt("port"); port != 0 {
-			cfg.Node.Port = port
-		}
-		if apiPort, _ := cmd.Flags().GetInt("api-port"); apiPort != 0 {
-			cfg.Node.APIPort = apiPort
-		}
-
-		// Create node manager
-		manager, err := node.NewManager(cfg)
-		if err != nil {
-			return fmt.Errorf("failed to create node manager: %w", err)
-		}
-		defer manager.Close()
-
-		// Start the node
-		if err := manager.Start(context.Background()); err != nil {
-			return fmt.Errorf("failed to start node: %w", err)
-		}
-
-		fmt.Println("Node started successfully!")
-		fmt.Printf("API endpoint: http://localhost:%d\n", cfg.Node.APIPort)
-		return nil
-	},
+	RunE:  runNodeStart,
 }
 
 var nodeStopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stop local Avalanche node",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Stopping local node...")
-
-		// Load config
-		cfg, err := config.Load()
-		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
-		}
-
-		// Create node manager
-		manager, err := node.NewManager(cfg)
-		if err != nil {
-			return fmt.Errorf("failed to create node manager: %w", err)
-		}
-		defer manager.Close()
-
-		// Stop the node
-		if err := manager.Stop(context.Background()); err != nil {
-			return fmt.Errorf("failed to stop node: %w", err)
-		}
-
-		fmt.Println("Node stopped successfully!")
-		return nil
-	},
+	RunE:  runNodeStop,
 }
 
 var nodeStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Check local node status",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Checking node status...")
+	RunE:  runNodeStatus,
+}
 
-		// Load config
-		cfg, err := config.Load()
-		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
-		}
+func runNodeStart(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+	cfg := config.Get()
 
-		// Create node manager
-		manager, err := node.NewManager(cfg)
-		if err != nil {
-			return fmt.Errorf("failed to create node manager: %w", err)
-		}
-		defer manager.Close()
+	// Override config with flags if provided
+	if apiPort, _ := cmd.Flags().GetInt("api-port"); apiPort != 0 {
+		cfg.Node.APIPort = apiPort
+	}
+	if nodePort, _ := cmd.Flags().GetInt("node-port"); nodePort != 0 {
+		cfg.Node.Port = nodePort
+	}
 
-		// Get node status
-		running, err := manager.Status(context.Background())
-		if err != nil {
-			return fmt.Errorf("failed to get node status: %w", err)
-		}
+	manager, err := node.NewManager(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create node manager: %w", err)
+	}
+	defer manager.Close()
 
-		if running {
-			fmt.Printf("Node is running (API endpoint: http://localhost:%d)\n", cfg.Node.APIPort)
-		} else {
-			fmt.Println("Node is not running")
-		}
-		return nil
-	},
+	if err := manager.Start(ctx, cfg); err != nil {
+		return fmt.Errorf("failed to start node: %w", err)
+	}
+
+	fmt.Println("Starting Avalanche node...")
+	fmt.Printf("API endpoint: http://localhost:%d\n", cfg.Node.APIPort)
+
+	// Wait for node to become healthy with a 2-minute timeout
+	fmt.Println("Waiting for node to become healthy...")
+	if err := manager.WaitForHealthy(ctx, 2*time.Minute); err != nil {
+		return fmt.Errorf("node failed to become healthy: %w", err)
+	}
+
+	fmt.Println("Node is healthy and ready!")
+	return nil
+}
+
+func runNodeStop(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+	cfg := config.Get()
+
+	manager, err := node.NewManager(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create node manager: %w", err)
+	}
+	defer manager.Close()
+
+	if err := manager.Stop(ctx); err != nil {
+		return fmt.Errorf("failed to stop node: %w", err)
+	}
+
+	fmt.Println("Node stopped successfully")
+	return nil
+}
+
+func runNodeStatus(cmd *cobra.Command, args []string) error {
+	ctx := cmd.Context()
+	cfg := config.Get()
+
+	manager, err := node.NewManager(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create node manager: %w", err)
+	}
+	defer manager.Close()
+
+	status, err := manager.CheckHealth(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to check node status: %w", err)
+	}
+
+	fmt.Printf("Node Status:\n")
+	fmt.Printf("  Running: %v\n", status.IsRunning)
+	if status.IsRunning {
+		fmt.Printf("  Healthy: %v\n", status.IsHealthy)
+		fmt.Printf("  Bootstrapped: %v\n", status.IsBootstrapped)
+		fmt.Printf("  Version: %s\n", status.Version)
+		fmt.Printf("  Network ID: %d\n", status.NetworkID)
+		fmt.Printf("  API Endpoint: http://localhost:%d\n", cfg.Node.APIPort)
+		fmt.Printf("  Last Checked: %s\n", status.LastChecked.Format(time.RFC3339))
+	}
+	if status.Error != "" {
+		fmt.Printf("  Error: %s\n", status.Error)
+	}
+
+	return nil
 }
 
 func init() {
@@ -122,6 +124,6 @@ func init() {
 	nodeCmd.AddCommand(nodeStatusCmd)
 
 	// Add flags
-	nodeStartCmd.Flags().IntP("port", "p", 9650, "Node port")
+	nodeStartCmd.Flags().IntP("node-port", "p", 9650, "Node port")
 	nodeStartCmd.Flags().IntP("api-port", "a", 9651, "API port")
 }

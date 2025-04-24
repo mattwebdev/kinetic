@@ -1,0 +1,102 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract {{.ContractName}} is ERC20, Ownable {
+    {{#if .HasCap}}
+    uint256 private immutable _cap;
+    {{/if}}
+
+    {{#if .IsBurnable}}
+    event TokensBurned(address indexed burner, uint256 amount);
+    {{/if}}
+
+    {{#if .IsPausable}}
+    bool public paused;
+    event Paused(address account);
+    event Unpaused(address account);
+    {{/if}}
+
+    constructor(
+        string memory name,
+        string memory symbol,
+        uint256 initialSupply{{#if .HasCap}},
+        uint256 cap{{/if}}
+    ) ERC20(name, symbol) Ownable(msg.sender) {
+        {{#if .HasCap}}
+        require(cap > 0, "Cap must be greater than 0");
+        require(initialSupply <= cap, "Initial supply cannot exceed cap");
+        _cap = cap;
+        {{/if}}
+        _mint(msg.sender, initialSupply);
+    }
+
+    {{#if .HasCap}}
+    function cap() public view returns (uint256) {
+        return _cap;
+    }
+
+    function _mint(address account, uint256 amount) internal virtual override {
+        require(ERC20.totalSupply() + amount <= _cap, "Cap exceeded");
+        super._mint(account, amount);
+    }
+    {{/if}}
+
+    {{#if .IsMintable}}
+    function mint(address to, uint256 amount) public onlyOwner {
+        {{#if .HasCap}}
+        require(ERC20.totalSupply() + amount <= _cap, "Cap exceeded");
+        {{/if}}
+        _mint(to, amount);
+    }
+    {{/if}}
+
+    {{#if .IsBurnable}}
+    function burn(uint256 amount) public {
+        _burn(msg.sender, amount);
+        emit TokensBurned(msg.sender, amount);
+    }
+
+    function burnFrom(address account, uint256 amount) public {
+        uint256 currentAllowance = allowance(account, msg.sender);
+        require(currentAllowance >= amount, "Burn amount exceeds allowance");
+        unchecked {
+            _approve(account, msg.sender, currentAllowance - amount);
+        }
+        _burn(account, amount);
+        emit TokensBurned(account, amount);
+    }
+    {{/if}}
+
+    {{#if .IsPausable}}
+    modifier whenNotPaused() {
+        require(!paused, "Token is paused");
+        _;
+    }
+
+    modifier whenPaused() {
+        require(paused, "Token is not paused");
+        _;
+    }
+
+    function pause() public onlyOwner whenNotPaused {
+        paused = true;
+        emit Paused(msg.sender);
+    }
+
+    function unpause() public onlyOwner whenPaused {
+        paused = false;
+        emit Unpaused(msg.sender);
+    }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal virtual override whenNotPaused {
+        super._beforeTokenTransfer(from, to, amount);
+    }
+    {{/if}}
+} 

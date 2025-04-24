@@ -1,0 +1,127 @@
+{
+    "templates": {
+        "ERC20": {
+            "name": "ERC20 Token",
+            "description": "Standard ERC20 token with optional features",
+            "options": {
+                "ContractName": {
+                    "type": "string",
+                    "description": "Name of the contract",
+                    "required": true
+                },
+                "HasCap": {
+                    "type": "boolean",
+                    "description": "Whether the token has a maximum supply cap",
+                    "default": false
+                },
+                "IsMintable": {
+                    "type": "boolean",
+                    "description": "Whether new tokens can be minted",
+                    "default": false
+                },
+                "IsBurnable": {
+                    "type": "boolean",
+                    "description": "Whether tokens can be burned",
+                    "default": false
+                },
+                "IsPausable": {
+                    "type": "boolean",
+                    "description": "Whether transfers can be paused",
+                    "default": false
+                }
+            }
+        },
+        "ERC721": {
+            "name": "ERC721 NFT",
+            "description": "Standard ERC721 NFT with optional features",
+            "options": {
+                "ContractName": {
+                    "type": "string",
+                    "description": "Name of the contract",
+                    "required": true
+                },
+                "HasMaxSupply": {
+                    "type": "boolean",
+                    "description": "Whether the NFT has a maximum supply",
+                    "default": false
+                },
+                "HasBaseURI": {
+                    "type": "boolean",
+                    "description": "Whether to use a base URI for token metadata",
+                    "default": true
+                },
+                "HasCustomURI": {
+                    "type": "boolean",
+                    "description": "Whether each token can have a custom URI",
+                    "default": false
+                },
+                "IsMintable": {
+                    "type": "boolean",
+                    "description": "Whether new tokens can be minted",
+                    "default": true
+                },
+                "OnlyOwnerCanMint": {
+                    "type": "boolean",
+                    "description": "Whether only the owner can mint tokens",
+                    "default": true
+                },
+                "IsBurnable": {
+                    "type": "boolean",
+                    "description": "Whether tokens can be burned",
+                    "default": false
+                },
+                "IsPausable": {
+                    "type": "boolean",
+                    "description": "Whether transfers can be paused",
+                    "default": false
+                }
+            }
+        },
+        "Basic": {
+            "name": "Basic Contract",
+            "description": "Basic contract template with common features",
+            "options": {
+                "ContractName": {
+                    "type": "string",
+                    "description": "Name of the contract",
+                    "required": true
+                },
+                "HasStorage": {
+                    "type": "boolean",
+                    "description": "Whether to include storage functionality",
+                    "default": true
+                },
+                "HasEvents": {
+                    "type": "boolean",
+                    "description": "Whether to include events",
+                    "default": true
+                },
+                "HasWhitelist": {
+                    "type": "boolean",
+                    "description": "Whether to include whitelist functionality",
+                    "default": false
+                },
+                "HasInitialSetup": {
+                    "type": "boolean",
+                    "description": "Whether to include initial setup code",
+                    "default": false
+                },
+                "HasEmergencyStop": {
+                    "type": "boolean",
+                    "description": "Whether to include emergency stop functionality",
+                    "default": false
+                },
+                "HasUpgradeable": {
+                    "type": "boolean",
+                    "description": "Whether to include upgrade functionality",
+                    "default": false
+                },
+                "HasEmergencyWithdraw": {
+                    "type": "boolean",
+                    "description": "Whether to include emergency withdraw functionality",
+                    "default": false
+                }
+            }
+        }
+    }
+} 

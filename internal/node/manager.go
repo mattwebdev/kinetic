@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/mount"
@@ -11,27 +12,47 @@ import (
 	"github.com/kinetic-dev/kinetic/internal/system"
 )
 
-// Manager handles Avalanche node operations
-type Manager struct {
+// Manager defines the interface for node management operations
+type Manager interface {
+	Start(ctx context.Context, cfg *config.Config) error
+	Stop(ctx context.Context) error
+	Status(ctx context.Context) (*Status, error)
+	CheckHealth(ctx context.Context) (*HealthStatus, error)
+	WaitForHealthy(ctx context.Context, timeout time.Duration) error
+	Close() error
+}
+
+// Status represents the node's status
+type Status struct {
+	IsRunning      bool      `json:"isRunning"`
+	IsHealthy      bool      `json:"isHealthy"`
+	IsBootstrapped bool      `json:"isBootstrapped"`
+	Version        string    `json:"version"`
+	NetworkID      int       `json:"networkId"`
+	APIEndpoint    string    `json:"apiEndpoint"`
+	LastChecked    time.Time `json:"lastChecked"`
+}
+
+// NodeManager handles Avalanche node operations
+type NodeManager struct {
 	cfg    *config.Config
 	docker *system.DockerClient
 }
 
 // NewManager creates a new node manager
-func NewManager(cfg *config.Config) (*Manager, error) {
+func NewManager(cfg *config.Config) (Manager, error) {
 	docker, err := system.NewDockerClient()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Docker client: %w", err)
+		return nil, fmt.Errorf("failed to create docker client: %w", err)
 	}
-
-	return &Manager{
+	return &NodeManager{
 		cfg:    cfg,
 		docker: docker,
 	}, nil
 }
 
 // Start starts the Avalanche node
-func (m *Manager) Start(ctx context.Context) error {
+func (m *NodeManager) Start(ctx context.Context, cfg *config.Config) error {
 	// Check if node is already running
 	running, err := m.docker.IsRunning(ctx, m.cfg.Docker.ContainerName)
 	if err != nil {
@@ -116,7 +137,7 @@ func (m *Manager) Start(ctx context.Context) error {
 }
 
 // Stop stops the Avalanche node
-func (m *Manager) Stop(ctx context.Context) error {
+func (m *NodeManager) Stop(ctx context.Context) error {
 	running, err := m.docker.IsRunning(ctx, m.cfg.Docker.ContainerName)
 	if err != nil {
 		return fmt.Errorf("failed to check node status: %w", err)
@@ -133,11 +154,26 @@ func (m *Manager) Stop(ctx context.Context) error {
 }
 
 // Status returns the current node status
-func (m *Manager) Status(ctx context.Context) (bool, error) {
-	return m.docker.IsRunning(ctx, m.cfg.Docker.ContainerName)
+func (m *NodeManager) Status(ctx context.Context) (*Status, error) {
+	running, err := m.docker.IsRunning(ctx, m.cfg.Docker.ContainerName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check node status: %w", err)
+	}
+
+	status := &Status{
+		IsRunning:      running,
+		IsHealthy:      running, // Assuming the node is healthy if it's running
+		IsBootstrapped: running, // This should be updated with actual bootstrap check
+		Version:        m.cfg.Docker.ImageTag,
+		NetworkID:      m.cfg.Node.NetworkID,
+		APIEndpoint:    fmt.Sprintf("http://localhost:%d", m.cfg.Node.APIPort),
+		LastChecked:    time.Now(),
+	}
+
+	return status, nil
 }
 
 // Close cleans up resources
-func (m *Manager) Close() error {
+func (m *NodeManager) Close() error {
 	return m.docker.Close()
 }
