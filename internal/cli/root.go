@@ -6,10 +6,9 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "kinetic",
-	Short: "Kinetic - Avalanche development environment",
-	Long: `Kinetic is a powerful development environment for Avalanche and Subnet development.
-It provides tools for managing local nodes, creating and deploying subnets,
-and working with smart contracts.`,
+	Short: "Kinetic - Avalanche development toolkit",
+	Long: `Kinetic is a development toolkit for building applications on Avalanche.
+It provides tools for managing local nodes, deploying contracts, and more.`,
 }
 
 func Execute() error {
@@ -22,6 +21,5 @@ func init() {
 
 	// Add commands
 	rootCmd.AddCommand(nodeCmd)
-	rootCmd.AddCommand(subnetCmd)
 	rootCmd.AddCommand(contractCmd)
 }
