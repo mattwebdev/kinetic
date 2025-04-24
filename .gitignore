@@ -1,0 +1,72 @@
+# Go specific
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# Build
+bin/
+dist/
+build/
+
+# IDE specific
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Dependency directories
+vendor/
+
+# Debug logs
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Kinetic specific
+.kinetic/
+node/
+db/
+logs/
+staking/
+
+# Blockchain & Contract artifacts
+artifacts/
+cache/
+node_modules/
+*.abi
+*.bin
+
+# Test coverage
+coverage/
+coverage.txt
+profile.out
+
+# macOS specific
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux specific
+*~
+.directory
+.Trash-*
+
+# Private keys and sensitive data
+*.pem
+*.key
+wallet.json
+private_keys.json 
