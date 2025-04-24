@@ -1,6 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * This is a template file that uses Go template syntax.
+ * The following variables can be used:
+ * - {{.ContractName}}: The name of the contract
+ * - {{#if .HasCap}}: Include maximum supply cap
+ * - {{#if .IsMintable}}: Include minting functionality
+ * - {{#if .IsBurnable}}: Include burning functionality
+ * - {{#if .IsPausable}}: Include pause functionality
+ *
+ * This template extends OpenZeppelin's ERC20 and Ownable contracts.
+ * The generated contract will include only the selected features.
+ */
+
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 

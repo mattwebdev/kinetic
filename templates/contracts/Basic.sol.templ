@@ -1,6 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/*
+ * This is a template file that uses Go template syntax.
+ * The following variables can be used:
+ * - {{.ContractName}}: The name of the contract
+ * - {{#if .HasStorage}}: Include storage functionality
+ * - {{#if .HasEvents}}: Include events
+ * - {{#if .HasWhitelist}}: Include whitelist functionality
+ * - {{#if .HasInitialSetup}}: Include initial setup code
+ * - {{#if .HasEmergencyStop}}: Include emergency stop functionality
+ * - {{#if .HasUpgradeable}}: Include upgrade functionality
+ * - {{#if .HasEmergencyWithdraw}}: Include emergency withdraw functionality
+ */
+
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract {{.ContractName}} is Ownable {
