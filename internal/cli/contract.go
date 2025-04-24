@@ -1,44 +1,18 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
-	"text/template"
 
+	"github.com/kinetic-dev/kinetic/internal/contracts"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 var contractCmd = &cobra.Command{
 	Use:   "contract",
 	Short: "Manage smart contracts",
 	Long:  `Commands for creating and managing smart contracts.`,
-}
-
-var contractListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List available contract templates",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// Read template configuration
-		configPath := "templates/contracts/config.json"
-		configData, err := os.ReadFile(configPath)
-		if err != nil {
-			return fmt.Errorf("failed to read template config: %w", err)
-		}
-
-		var config TemplateConfig
-		if err := json.Unmarshal(configData, &config); err != nil {
-			return fmt.Errorf("failed to parse template config: %w", err)
-		}
-
-		fmt.Println("Available templates:")
-		for name, tmpl := range config.Templates {
-			fmt.Printf("- %s: %s\n", name, tmpl.Description)
-		}
-		return nil
-	},
 }
 
 var contractCreateCmd = &cobra.Command{
@@ -68,149 +42,49 @@ var contractDeployCmd = &cobra.Command{
 	},
 }
 
-type TemplateConfig struct {
-	Templates map[string]struct {
-		Name        string `json:"name"`
-		Description string `json:"description"`
-		Options     map[string]struct {
-			Type        string `json:"type"`
-			Description string `json:"description"`
-			Required    bool   `json:"required"`
-			Default     any    `json:"default,omitempty"`
-		} `json:"options"`
-	} `json:"templates"`
-}
-
 func runContractCreate(cmd *cobra.Command, args []string) error {
 	templateName := args[0]
 	contractName := args[1]
 
-	// Get the user's current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	// Get output directory from flag, default to current working directory if not specified
+	// Get output directory from flag
 	outputDir, err := cmd.Flags().GetString("output-dir")
 	if err != nil {
 		return fmt.Errorf("failed to get output directory flag: %w", err)
 	}
-	if outputDir == "" {
-		outputDir = cwd
-	} else {
-		// If relative path, make it relative to current working directory
-		if !filepath.IsAbs(outputDir) {
-			outputDir = filepath.Join(cwd, outputDir)
+
+	// Collect template flags
+	templateFlags := make(map[string]interface{})
+	cmd.Flags().Visit(func(f *pflag.Flag) {
+		if f.Name != "output-dir" {
+			templateFlags[camelCase(f.Name)] = f.Value
 		}
+	})
+
+	// Create contract using the contracts package
+	opts := contracts.CreateOptions{
+		TemplateName:  templateName,
+		ContractName:  contractName,
+		OutputDir:     outputDir,
+		TemplateFlags: templateFlags,
 	}
 
-	// Read template configuration - use absolute path from project root
-	projectRoot := filepath.Dir(filepath.Dir(filepath.Dir(cwd))) // Go up to project root
-	configPath := filepath.Join(projectRoot, "templates", "contracts", "config.json")
-	configData, err := os.ReadFile(configPath)
-	if err != nil {
-		return fmt.Errorf("failed to read template config: %w", err)
+	if err := contracts.Create(opts); err != nil {
+		return err
 	}
 
-	var config TemplateConfig
-	if err := json.Unmarshal(configData, &config); err != nil {
-		return fmt.Errorf("failed to parse template config: %w", err)
-	}
-
-	// Validate template name
-	templateConfig, ok := config.Templates[templateName]
-	if !ok {
-		return fmt.Errorf("invalid template name. Available templates: %s", strings.Join(getTemplateNames(config), ", "))
-	}
-
-	// Create template data with defaults
-	templateData := map[string]interface{}{
-		"ContractName": contractName,
-	}
-
-	// Set default values for all options
-	for name, opt := range templateConfig.Options {
-		if opt.Default != nil {
-			templateData[name] = opt.Default
-		}
-	}
-
-	// Override defaults with flags
-	for name, opt := range templateConfig.Options {
-		if name == "ContractName" {
-			continue
-		}
-
-		if opt.Type == "boolean" {
-			if val, _ := cmd.Flags().GetBool(kebabCase(name)); cmd.Flags().Changed(kebabCase(name)) {
-				templateData[name] = val
-			}
-		} else if opt.Type == "string" {
-			if val, _ := cmd.Flags().GetString(kebabCase(name)); cmd.Flags().Changed(kebabCase(name)) {
-				templateData[name] = val
-			}
-		}
-	}
-
-	// Read template file - use absolute path from project root
-	templatePath := filepath.Join(projectRoot, "templates", "contracts", fmt.Sprintf("%s.sol.tmpl", templateName))
-	tmplContent, err := os.ReadFile(templatePath)
-	if err != nil {
-		return fmt.Errorf("failed to read template file: %w", err)
-	}
-
-	// Create output directory if it doesn't exist
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
-	}
-
-	// Create output file in the specified directory
-	outputPath := filepath.Join(outputDir, fmt.Sprintf("%s.sol", contractName))
-	outputFile, err := os.Create(outputPath)
-	if err != nil {
-		return fmt.Errorf("failed to create output file: %w", err)
-	}
-	defer outputFile.Close()
-
-	// Parse and execute template
-	tmpl, err := template.New("contract").Parse(string(tmplContent))
-	if err != nil {
-		return fmt.Errorf("failed to parse template: %w", err)
-	}
-
-	if err := tmpl.Execute(outputFile, templateData); err != nil {
-		return fmt.Errorf("failed to generate contract: %w", err)
-	}
-
-	// Display the path relative to where the user ran the command
-	relPath, err := filepath.Rel(cwd, outputPath)
-	if err != nil {
-		// Fall back to absolute path if relative path fails
-		relPath = outputPath
-	}
-	if relPath == "" {
-		relPath = filepath.Base(outputPath)
-	}
-
-	fmt.Printf("Contract created successfully: %s\n", relPath)
+	fmt.Printf("Contract created successfully: %s\n", contractName)
 	return nil
 }
 
-func getTemplateNames(config TemplateConfig) []string {
-	names := make([]string, 0, len(config.Templates))
-	for name := range config.Templates {
-		names = append(names, name)
+func camelCase(s string) string {
+	parts := strings.Split(s, "-")
+	for i := 1; i < len(parts); i++ {
+		parts[i] = strings.Title(parts[i])
 	}
-	return names
-}
-
-func kebabCase(s string) string {
-	return strings.ToLower(strings.ReplaceAll(s, "Has", "has-"))
+	return strings.Join(parts, "")
 }
 
 func init() {
-	contractCmd.AddCommand(contractListCmd)
 	contractCmd.AddCommand(contractCreateCmd)
 	contractCmd.AddCommand(contractDeployCmd)
 

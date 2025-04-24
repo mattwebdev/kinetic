@@ -1,15 +1,13 @@
-package cli
+package contracts
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/spf13/cobra"
 )
 
-func TestRunContractCreate(t *testing.T) {
+func TestCreate(t *testing.T) {
 	// Create a temporary directory for test files
 	tmpDir, err := os.MkdirTemp("", "contract-test")
 	if err != nil {
@@ -74,15 +72,30 @@ contract {{.ContractName}} {
 		t.Fatalf("Failed to create output dir: %v", err)
 	}
 
-	// Create test command
-	cmd := &cobra.Command{}
-	cmd.Flags().String("output-dir", outputDir, "")
-	cmd.Flags().Bool("has-max-supply", true, "")
-	cmd.Flags().String("max-supply", "2000000", "")
+	// Set up test environment
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change working directory: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(filepath.Dir(tmpDir)); err != nil {
+			t.Errorf("Failed to restore working directory: %v", err)
+		}
+	}()
+
+	// Create contract with options
+	opts := CreateOptions{
+		TemplateName: "Basic",
+		ContractName: "MyContract",
+		OutputDir:    outputDir,
+		TemplateFlags: map[string]interface{}{
+			"HasMaxSupply": true,
+			"MaxSupply":    "2000000",
+		},
+	}
 
 	// Run the command
-	if err := runContractCreate(cmd, []string{"Basic", "MyContract"}); err != nil {
-		t.Fatalf("runContractCreate failed: %v", err)
+	if err := Create(opts); err != nil {
+		t.Fatalf("Create failed: %v", err)
 	}
 
 	// Check if output file exists
